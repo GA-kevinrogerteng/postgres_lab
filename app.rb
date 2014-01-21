@@ -8,39 +8,54 @@ def dbname
 end
 
 def with_db
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   yield c
   c.close
 end
 
 get '/' do
+  create_products_table
+  create_categories_table
+  # seed_products_table
   erb :index
 end
-
+#############################################################################
 # The Products machinery:
 
 # Get the index of products
 get '/products' do
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
 
   # Get all rows from the products table.
   @products = c.exec_params("SELECT * FROM products;")
   c.close
   erb :products
 end
+##############################################################################
+get '/categories' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
 
-# Get the form for creating a new product
-get '/products/new' do
-  erb :new_product
+  # Get all rows from the products table.
+  @categories = c.exec_params("SELECT * FROM categories;")
+  c.close
+  erb :categories
 end
 
+##############################################################################
+# Get the form for creating a new product
+get '/products/new' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  @categories = c.exec_params("SELECT * FROM categories;")
+  c.close
+  erb :new_product
+end
+##############################################################################
 # POST to create a new product
 post '/products' do
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
-
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   # Insert the new row into the products table.
-  c.exec_params("INSERT INTO products (name, price, description) VALUES ($1,$2,$3)",
-                  [params["name"], params["price"], params["description"]])
+  c.exec_params("INSERT INTO products (name, price, description, category_id) VALUES ($1,$2,$3,$4)",
+                  [params["name"], params["price"], params["description"], params["category"]])
 
   # Assuming you created your products table with "id SERIAL PRIMARY KEY",
   # This will get the id of the product you just created.
@@ -48,60 +63,129 @@ post '/products' do
   c.close
   redirect "/products/#{new_product_id}"
 end
-
-# Update a product
-post '/products/:id' do
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
-
-  # Update the product.
-  c.exec_params("UPDATE products SET (name, price, description) = ($2, $3, $4) WHERE products.id = $1 ",
-                [params["id"], params["name"], params["price"], params["description"]])
-  c.close
-  redirect "/products/#{params["id"]}"
+##############################################################################
+get '/categories/new' do
+  erb :new_categories
 end
 
+##############################################################################
+# POST to create a new Category
+post '/categories' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+
+  # Insert the new row into the products table.
+  c.exec_params("INSERT INTO categories (name, description) VALUES ($1,$2)",
+                  [params["name"], params["description"]])
+
+  # Assuming you created your products table with "id SERIAL PRIMARY KEY",
+  # This will get the id of the product you just created.
+  new_categories_id = c.exec_params("SELECT currval('categories_id_seq');").first["currval"]
+  c.close
+  redirect "/categories/#{new_categories_id}"
+end
+##############################################################################
+# Update a product
+post '/products/:id' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+
+  # Update the product.
+  c.exec_params("UPDATE products SET (name, price, description, category_id) = ($2, $3, $4, $5) WHERE products.id = $1 ",
+                [params["id"], params["name"], params["price"], params["description"], params["category"]])
+  c.close
+  redirect "/products/#{params['id']}"
+end
+##############################################################################
+#Update a category
+post '/categories/:id' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+
+  # Update the product.
+  c.exec_params("UPDATE categories SET (name, description) = ($2, $3) WHERE categories.id = $1 ",
+                [params["id"], params["name"], params["description"]])
+  c.close
+  redirect "/categories/#{params['id']}"
+end
+##############################################################################
 get '/products/:id/edit' do
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   @product = c.exec_params("SELECT * FROM products WHERE products.id = $1", [params["id"]]).first
   c.close
   erb :edit_product
 end
+##############################################################################
+get '/categories/:id/edit' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  @categories = c.exec_params("SELECT * FROM categories WHERE categories.id = $1", [params["id"]]).first
+  c.close
+  erb :edit_categories
+end
+##############################################################################
 # DELETE to delete a product
 post '/products/:id/destroy' do
 
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   c.exec_params("DELETE FROM products WHERE products.id = $1", [params["id"]])
   c.close
   redirect '/products'
 end
+##############################################################################
+post '/categories/:id/destroy' do
 
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  c.exec_params("DELETE FROM categories WHERE categories.id = $1", [params["id"]])
+  c.close
+  redirect '/categories'
+end
+##############################################################################
 # GET the show page for a particular product
 get '/products/:id' do
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   @product = c.exec_params("SELECT * FROM products WHERE products.id = $1;", [params[:id]]).first
+  @categories = c.exec_params("SELECT c.name FROM categories AS c INNER JOIN products AS p ON c.id=p.id;")
   c.close
   erb :product
 end
-
+##############################################################################
+get '/categories/:id' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  @categories = c.exec_params("SELECT * FROM categories WHERE categories.id = $1;", [params[:id]]).first
+  c.close
+  erb :category
+end
+##############################################################################
 def create_products_table
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   c.exec %q{
-  CREATE TABLE products (
+  CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
     name varchar(255),
     price decimal,
-    description text
+    description text,
+    category_id INTEGER
   );
   }
   c.close
 end
-
+##############################################################################
+def create_categories_table
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  c.exec %q{
+  CREATE TABLE IF NOT EXISTS categories (
+    id SERIAL PRIMARY KEY,
+    name varchar(255),
+    description TEXT,
+    product_id INTEGER
+  );
+  }
+  c.close
+end
+##############################################################################
 def drop_products_table
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   c.exec "DROP TABLE products;"
   c.close
 end
-
+##############################################################################
 def seed_products_table
   products = [["Laser", "325", "Good for lasering."],
               ["Shoe", "23.4", "Just the left one."],
@@ -114,7 +198,7 @@ def seed_products_table
               ["Toaster", "20.00", "Toasts your enemies!"],
              ]
 
-  c = PGconn.new(:host => "localhost", :dbname => dbname)
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
   products.each do |p|
     c.exec_params("INSERT INTO products (name, price, description) VALUES ($1, $2, $3);", p)
   end

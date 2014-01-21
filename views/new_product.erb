@@ -13,8 +13,13 @@
     <label>Description:</label>
     <textarea name="description"></textarea>
   </p>
+  <select name ="category">
+    <% @categories.each do |categories| %>
+      <option value=<%="#{categories['id']}"%> selected> <%= "#{categories['name']}" %> </option> 
+      <%end %>
+  </select>
 
   <p>
-    <input type="submit" name="" value=" Create the new product.">
+    <input type="submit" name="new_product" value=" Create the new product.">
   </p>
 </form>
