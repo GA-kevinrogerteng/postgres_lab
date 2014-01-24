@@ -13,7 +13,8 @@
     <label>Description:</label>
     <textarea name="description"></textarea>
   </p>
-  <select name ="category">
+  <p> Category: </p>
+  <select name ="category" multiple>
     <% @categories.each do |categories| %>
       <option value=<%="#{categories['id']}"%> selected> <%= "#{categories['name']}" %> </option> 
       <%end %>

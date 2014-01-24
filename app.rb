@@ -16,7 +16,8 @@ end
 get '/' do
   create_products_table
   create_categories_table
-  # seed_products_table
+  create_product_categories_table
+  seed_products_table
   erb :index
 end
 #############################################################################
@@ -54,14 +55,28 @@ end
 post '/products' do
   c = PGconn.new(:host => "localhost", :dbname => "all_products")
   # Insert the new row into the products table.
-  c.exec_params("INSERT INTO products (name, price, description, category_id) VALUES ($1,$2,$3,$4)",
-                  [params["name"], params["price"], params["description"], params["category"]])
-
+  c.exec_params("INSERT INTO products (name, price, description) VALUES ($1,$2,$3)",
+                  [params["name"], params["price"], params["description"]])
   # Assuming you created your products table with "id SERIAL PRIMARY KEY",
   # This will get the id of the product you just created.
+  new_category = params["category"].to_i
   new_product_id = c.exec_params("SELECT currval('products_id_seq');").first["currval"]
+  #insert the new product id into the product_categories tabel
+  c.exec_params("INSERT INTO product_categories (product_id, category_id) VALUES ($1, $2)",
+                  [new_product_id], params["category"])
   c.close
   redirect "/products/#{new_product_id}"
+end
+##############################################################################
+# Update a product
+post '/products/:id' do
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+
+  # Update the product.
+  c.exec_params("UPDATE products SET (name, price, description) = ($2, $3, $4) WHERE products.id = $1 ",
+                [params["id"], params["name"], params["price"], params["description"]])
+  c.close
+  redirect "/products/#{params['id']}"
 end
 ##############################################################################
 get '/categories/new' do
@@ -83,17 +98,7 @@ post '/categories' do
   c.close
   redirect "/categories/#{new_categories_id}"
 end
-##############################################################################
-# Update a product
-post '/products/:id' do
-  c = PGconn.new(:host => "localhost", :dbname => "all_products")
 
-  # Update the product.
-  c.exec_params("UPDATE products SET (name, price, description, category_id) = ($2, $3, $4, $5) WHERE products.id = $1 ",
-                [params["id"], params["name"], params["price"], params["description"], params["category"]])
-  c.close
-  redirect "/products/#{params['id']}"
-end
 ##############################################################################
 #Update a category
 post '/categories/:id' do
@@ -109,6 +114,7 @@ end
 get '/products/:id/edit' do
   c = PGconn.new(:host => "localhost", :dbname => "all_products")
   @product = c.exec_params("SELECT * FROM products WHERE products.id = $1", [params["id"]]).first
+  @categories = c.exec_params("SELECT * FROM categories;")
   c.close
   erb :edit_product
 end
@@ -141,7 +147,8 @@ end
 get '/products/:id' do
   c = PGconn.new(:host => "localhost", :dbname => "all_products")
   @product = c.exec_params("SELECT * FROM products WHERE products.id = $1;", [params[:id]]).first
-  @categories = c.exec_params("SELECT c.name FROM categories AS c INNER JOIN products AS p ON c.id=p.id;")
+  # category_id = @product['category_id']
+  # @categories = c.exec_params("SELECT * FROM categories WHERE categories.id =$1;", [category_id])
   c.close
   erb :product
 end
@@ -160,8 +167,7 @@ def create_products_table
     id SERIAL PRIMARY KEY,
     name varchar(255),
     price decimal,
-    description text,
-    category_id INTEGER
+    description text
   );
   }
   c.close
@@ -173,12 +179,24 @@ def create_categories_table
   CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name varchar(255),
-    description TEXT,
-    product_id INTEGER
+    description TEXT
   );
   }
   c.close
 end
+##############################################################################
+def create_product_categories_table
+  c = PGconn.new(:host => "localhost", :dbname => "all_products")
+  c.exec %q{
+  CREATE TABLE IF NOT EXISTS product_categories (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER,
+    category_id INTEGER
+  );
+  }
+  c.close
+end
+
 ##############################################################################
 def drop_products_table
   c = PGconn.new(:host => "localhost", :dbname => "all_products")
